@@ -1,4 +1,4 @@
-version: "2.25.0"
+version: "3.8"
 
 services:
   banner-shift:
@@ -13,13 +13,16 @@ services:
       - banner-shift-net
 
   postgres:
+    container_name: postgres
     image: postgres:16
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - banner-shift-net
     restart: always
 
 networks:
