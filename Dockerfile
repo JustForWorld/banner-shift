@@ -24,4 +24,4 @@ COPY --from=builder /bin/banner-shift /banner-shift
 
 EXPOSE 8080
 
-CMD ["/banner-shift", "--config", "/config/local.yaml"]
+CMD ["/banner-shift", "--config", "./config/local.yaml"]

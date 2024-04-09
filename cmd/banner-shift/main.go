@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -21,9 +23,10 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	cfg := config.MustLoad()
 
-	_ = cfg
+	log := setupLogger(cfg.Env)
 
-	// TODO: add logger
+	log.Info("starting banner-shift", slog.String("env", cfg.Env))
+	log.Debug("debug messages are enabled")
 
 	// TODO: storage: postresql
 
@@ -36,4 +39,31 @@ func main() {
 
 	http.HandleFunc("/", testHandler)
 	http.ListenAndServe(":8080", nil)
+}
+
+func setupLogger(env string) *slog.Logger {
+	var log *slog.Logger
+
+	switch env {
+	case envLocal:
+		log = slog.New(slog.NewTextHandler(os.Stdout,
+			&slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			},
+		))
+	case envDev:
+		log = slog.New(slog.NewJSONHandler(os.Stdout,
+			&slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			},
+		))
+	case envProd:
+		log = slog.New(slog.NewJSONHandler(os.Stdout,
+			&slog.HandlerOptions{
+				Level: slog.LevelInfo,
+			},
+		))
+	}
+
+	return log
 }

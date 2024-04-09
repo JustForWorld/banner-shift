@@ -30,6 +30,7 @@ type PostgreSQL struct {
 }
 
 func MustLoad() *Config {
+	// TODO: remove default value
 	configPath := flag.String("config", "./config/local.yaml", "for initiate configuration")
 	flag.Parse()
 
