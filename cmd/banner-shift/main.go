@@ -4,7 +4,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/JustForWorld/banner-shift/internal/config"
 	"github.com/go-chi/chi/v5"
+)
+
+const (
+	envLocal = "local"
+	envDev   = "dev"
+	envProd  = "prod"
 )
 
 func testHandler(w http.ResponseWriter, r *http.Request) {
@@ -12,7 +19,9 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// TODO: add config
+	cfg := config.MustLoad()
+
+	_ = cfg
 
 	// TODO: add logger
 
