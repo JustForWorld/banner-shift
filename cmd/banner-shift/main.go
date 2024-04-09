@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
+	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -28,7 +29,19 @@ func main() {
 	log.Info("starting banner-shift", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled")
 
-	// TODO: storage: postresql
+	storage, err := postgresql.New(
+		cfg.User,
+		cfg.Password,
+		cfg.Host,
+		cfg.DB,
+		cfg.Port,
+	)
+	if err != nil {
+		slog.Error("failed to init storage: %w", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(storage)
 
 	// TODO: router: go-chi
 
