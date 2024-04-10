@@ -43,6 +43,14 @@ func main() {
 
 	fmt.Println(storage)
 
+	// Test create banner
+	id, err := storage.CreateBanner(1, []int{1, 2}, "asdasd", true)
+	if err != nil {
+		slog.Error("failed to get banner id: %w", err)
+		os.Exit(1)
+	}
+	fmt.Println(id)
+
 	// TODO: router: go-chi
 
 	// TODO: run server
