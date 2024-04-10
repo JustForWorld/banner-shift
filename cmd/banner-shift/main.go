@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
@@ -50,6 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println(id)
+
+	time.Sleep(15 * time.Second)
+
+	err = storage.UpdateBanner(id, 1, []int{2, 3}, "sads", false)
+	if err != nil {
+		slog.Error("failed to get banner id: %w", err)
+		os.Exit(1)
+	}
 
 	// TODO: router: go-chi
 
