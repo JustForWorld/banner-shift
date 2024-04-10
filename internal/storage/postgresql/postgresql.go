@@ -182,21 +182,19 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	// insert banner with tagIDs
 	for _, tagID := range tagIDs {
 		stmtNewBannerTag, err := s.db.Prepare(`
-			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3) RETURNING id
+			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3)
 		`)
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
 
-		var bannerTagID int64
-		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Scan(&bannerTagID)
+		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
 		if err != nil {
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
 				return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
 			}
 			return 0, fmt.Errorf("%s: failed to add banner_tag row: %w", op, err)
 		}
-		_ = bannerTagID
 	}
 
 	return bannerID, nil
@@ -208,49 +206,38 @@ func (s *Storage) UpdateBanner(bannerID int, featureID int, tagIDs []int, conten
 	// update banner
 	stmtUpdateBanner, err := s.db.Prepare(`
 		UPDATE banner
-		SET content = ($1), is_active = ($2), feature_id = ($3)
+		SET content = ($1), is_active = ($2), feature_id = ($3), updated_at = CURRENT_TIMESTAMP
 		WHERE id = ($4);
 	`)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	err = stmtUpdateBanner.QueryRow(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID).Err()
+	// err = stmtUpdateBanner.QueryRow(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID).Err()
+	_, err = stmtUpdateBanner.Exec(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
 	}
 
-	// update banner_tag with tagIDS
-	// tags := make([]int, len(tagIDs))
-	// copy(tags, tagIDs)
-
-	stmtAllBannerTags, err := s.db.Prepare(`
-		SELECT id FROM banner_tag WHERE banner_id = ($1)
-	`)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-
-	rows, err := stmtAllBannerTags.Query(bannerID)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
-	}
-	defer rows.Close()
-
-	bannerTags := make([]int64, 0, 1024)
-	for rows.Next() {
-		var id int64
-		err := rows.Scan(&id)
+	// insert banner with tagIDs
+	for _, tagID := range tagIDs {
+		// TODO: change to UPDATE (there's no point now?)
+		stmtNewBannerTag, err := s.db.Prepare(`
+			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3)
+			ON CONFLICT (tag_id, feature_id) DO UPDATE SET banner_id = ($1), tag_id = ($2), feature_id = ($3);
+		`)
 		if err != nil {
-			return fmt.Errorf("error scanning rows: %w", err)
+			return fmt.Errorf("%s: %w", op, err)
 		}
-		bannerTags = append(bannerTags, id)
-	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating over banner_ids: %w", err)
-	}
 
-	fmt.Println(bannerTags)
+		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
+				return fmt.Errorf("4: %s: %w", op, storage.ErrBannerExists)
+			}
+			return fmt.Errorf("5: %s: failed to update banner_tag row: %w", op, err)
+		}
+	}
 
 	return nil
 }
