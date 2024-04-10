@@ -103,6 +103,23 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 		return nil, fmt.Errorf("exec relation between banner < banner_tag: %s: %w", op, err)
 	}
 
+	// create references for cascade delete and update banner_tag and banner
+	// stmtCascadeBanner, err := db.Prepare(`
+	// 	ALTER TABLE banner_tag
+	// 	ADD FOREIGN KEY (banner_id)
+	// 	REFERENCES banner (id)
+	// 	ON DELETE CASCADE
+	// 	ON UPDATE CASCADE;
+	// `)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("create references for cascade delete and update banner_tag and banner: %s: %w", op, err)
+	// }
+
+	// _, err = stmtCascadeBanner.Exec()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("exec references for cascade delete and update banner_tag and banner: %s: %w", op, err)
+	// }
+
 	// create relations between banner > feature tables
 	stmtRelFeature, err := db.Prepare(`
 		ALTER TABLE banner ADD FOREIGN KEY (feature_id) REFERENCES feature (id);
@@ -183,4 +200,57 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	}
 
 	return bannerID, nil
+}
+
+func (s *Storage) UpdateBanner(bannerID int, featureID int, tagIDs []int, content string, isActive bool) error {
+	const op = "storage.postgresql.UpdateBanner"
+
+	// update banner
+	stmtUpdateBanner, err := s.db.Prepare(`
+		UPDATE banner
+		SET content = ($1), is_active = ($2), feature_id = ($3)
+		WHERE id = ($4);
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	err = stmtUpdateBanner.QueryRow(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID).Err()
+	if err != nil {
+		return fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
+	}
+
+	// update banner_tag with tagIDS
+	// tags := make([]int, len(tagIDs))
+	// copy(tags, tagIDs)
+
+	stmtAllBannerTags, err := s.db.Prepare(`
+		SELECT id FROM banner_tag WHERE banner_id = ($1)
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	rows, err := stmtAllBannerTags.Query(bannerID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	bannerTags := make([]int64, 0, 1024)
+	for rows.Next() {
+		var id int64
+		err := rows.Scan(&id)
+		if err != nil {
+			return fmt.Errorf("error scanning rows: %w", err)
+		}
+		bannerTags = append(bannerTags, id)
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error iterating over banner_ids: %w", err)
+	}
+
+	fmt.Println(bannerTags)
+
+	return nil
 }
