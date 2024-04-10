@@ -200,7 +200,7 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	return bannerID, nil
 }
 
-func (s *Storage) UpdateBanner(bannerID int, featureID int, tagIDs []int, content string, isActive bool) error {
+func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content string, isActive bool) error {
 	const op = "storage.postgresql.UpdateBanner"
 
 	// update banner
@@ -213,7 +213,6 @@ func (s *Storage) UpdateBanner(bannerID int, featureID int, tagIDs []int, conten
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	// err = stmtUpdateBanner.QueryRow(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID).Err()
 	_, err = stmtUpdateBanner.Exec(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
@@ -233,9 +232,9 @@ func (s *Storage) UpdateBanner(bannerID int, featureID int, tagIDs []int, conten
 		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
 		if err != nil {
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
-				return fmt.Errorf("4: %s: %w", op, storage.ErrBannerExists)
+				return fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
 			}
-			return fmt.Errorf("5: %s: failed to update banner_tag row: %w", op, err)
+			return fmt.Errorf("v: %s: failed to update banner_tag row: %w", op, err)
 		}
 	}
 
