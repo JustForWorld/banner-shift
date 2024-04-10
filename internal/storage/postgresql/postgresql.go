@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	"github.com/JustForWorld/banner-shift/internal/storage"
+	"github.com/lib/pq"
 )
 
 type Storage struct {
@@ -44,6 +45,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	// create banner_tag table
 	stmtBannerTag, err := db.Prepare(`
 		CREATE TABLE IF NOT EXISTS banner_tag (
+			id SERIAL PRIMARY KEY,
 			banner_id INTEGER,
 			tag_id INTEGER,
 			feature_id INTEGER
@@ -129,7 +131,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 
 	// create UNIQUE CONSTAINT with tag_id and feature_id
 	stmtUniqueTagFeature, err := db.Prepare(`
-		ALTER TABLE banner_tag ADD CONSTRAINT unique_tag_feuture UNIQUE (tag_id, feature_id);
+		ALTER TABLE banner_tag ADD CONSTRAINT unique_tag_feature UNIQUE (tag_id, feature_id);
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create UNIQUE CONSTAINT with tag_id and feature_id: %s: %w", op, err)
@@ -141,4 +143,44 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	}
 
 	return &Storage{db: db}, nil
+}
+
+func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isActive bool) (int64, error) {
+	const op = "storage.postgresql.CreateBanner"
+
+	// insert new banner
+	stmtNewBanner, err := s.db.Prepare(`
+		INSERT INTO banner(content, is_active, feature_id) VALUES($1, $2, $3) RETURNING id
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var bannerID int64
+	err = stmtNewBanner.QueryRow(`{"example_key": "example_value"}`, isActive, featureID).Scan(&bannerID)
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
+	}
+
+	// insert banner with tagIDs
+	for _, tagID := range tagIDs {
+		stmtNewBannerTag, err := s.db.Prepare(`
+			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3) RETURNING id
+		`)
+		if err != nil {
+			return 0, fmt.Errorf("%s: %w", op, err)
+		}
+
+		var bannerTagID int64
+		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Scan(&bannerTagID)
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
+				return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
+			}
+			return 0, fmt.Errorf("%s: failed to add banner_tag row: %w", op, err)
+		}
+		_ = bannerTagID
+	}
+
+	return bannerID, nil
 }
