@@ -46,14 +46,20 @@ func main() {
 
 	// Test create banner
 	fmt.Println("start create")
-	id, err := storage.CreateBanner(1, []int{1, 2}, `{"sdsd": "sdsda"}`, true)
+	id, err := storage.CreateBanner(1, []int{1, 2}, `{"qqq1": "q1q1q"}`, true)
 	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
+		slog.Error("failed to create banner: %w", err)
 		os.Exit(1)
 	}
-	_, err = storage.CreateBanner(2, []int{2, 4}, `{"qqq": "q2q2q"}`, true)
+	_, err = storage.CreateBanner(2, []int{2, 4}, `{"qqq2": "q2q2q"}`, true)
 	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
+		slog.Error("failed to create banner: %w", err)
+		os.Exit(1)
+	}
+
+	_, err = storage.CreateBanner(3, []int{1, 2}, `{"qqq3": "q3q3q"}`, true)
+	if err != nil {
+		slog.Error("failed to create banner: %w", err)
 		os.Exit(1)
 	}
 	fmt.Println(id)
@@ -61,45 +67,53 @@ func main() {
 	fmt.Println("------------------------------------")
 
 	fmt.Println("start update...")
-	time.Sleep(10 * time.Second)
+	time.Sleep(12 * time.Second)
 
 	// Test update banner
-	err = storage.UpdateBanner(id, 1, []int{2, 3, 4}, `{"sdsd3": "sdsda2"}`, false)
+	err = storage.UpdateBanner(id, 1, []int{2, 3, 4}, `{"qqq4": "q4q4"}`, false)
 	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
+		slog.Error("failed to update banner: %w", err)
 		os.Exit(1)
 	}
 	fmt.Println("finish update")
 	fmt.Println("------------------------------------")
 
+	// Get banner list
+	list, err := storage.GetBannerList(3, 2, 10, 5)
+	if err != nil {
+		slog.Error("failed to get banner list: %w", err)
+		os.Exit(1)
+	}
+	fmt.Println(list)
+
 	//Get banner (exist)
-	content, err := storage.GetBanner(id, 1)
-	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
-		os.Exit(1)
-	}
-	fmt.Println(content)
+	// content, err := storage.GetBanner(id, 1)
+	// if err != nil {
+	// 	slog.Error("failed to get banner id: %w", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println(content)
 
-	fmt.Println("start delete...")
-	time.Sleep(10 * time.Second)
+	// fmt.Println("start delete...")
+	// time.Sleep(10 * time.Second)
 
-	err = storage.DeleteBanner(id)
-	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
-		os.Exit(1)
-	}
+	// err = storage.DeleteBanner(id)
+	// if err != nil {
+	// 	slog.Error("failed to get banner id: %w", err)
+	// 	os.Exit(1)
+	// }
 
-	fmt.Println("finish delete")
-	fmt.Println("------------------------------------")
+	// fmt.Println("finish delete")
+	// fmt.Println("------------------------------------")
 
 	//Get banner (not exist)
-	content, err = storage.GetBanner(id, 1)
-	fmt.Println(content)
-	if err != nil {
-		slog.Error("failed to get banner id: %w", err)
-		os.Exit(1)
-	}
-	fmt.Println(content)
+	// content, err = storage.GetBanner(id, 1)
+	// fmt.Println(content)
+	// if err != nil {
+	// 	slog.Error("failed to get banner id: %w", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println(content)
 
 	// TODO: router: go-chi
 
