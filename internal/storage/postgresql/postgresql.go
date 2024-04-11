@@ -174,8 +174,11 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	}
 
 	var bannerID int64
-	err = stmtNewBanner.QueryRow(`{"example_key": "example_value"}`, isActive, featureID).Scan(&bannerID)
+	err = stmtNewBanner.QueryRow(content, isActive, featureID).Scan(&bannerID)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
+			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+		}
 		return 0, fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
 	}
 
@@ -213,8 +216,11 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	_, err = stmtUpdateBanner.Exec(`{"example_key2": "example_value2"}`, isActive, featureID, bannerID)
+	_, err = stmtUpdateBanner.Exec(content, isActive, featureID, bannerID)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
+			return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+		}
 		return fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
 	}
 
@@ -231,10 +237,10 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 
 		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
 		if err != nil {
-			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
-				return fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "foreign_key_violation" {
+				return fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
 			}
-			return fmt.Errorf("v: %s: failed to update banner_tag row: %w", op, err)
+			return fmt.Errorf("%s: failed to update banner_tag row: %w", op, err)
 		}
 	}
 

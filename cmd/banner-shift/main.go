@@ -45,20 +45,25 @@ func main() {
 	fmt.Println(storage)
 
 	// Test create banner
-	id, err := storage.CreateBanner(1, []int{1, 2}, "asdasd", true)
+	fmt.Println("start create")
+	id, err := storage.CreateBanner(1, []int{1, 2}, `{"sdsd": "sdsda"}`, true)
 	if err != nil {
 		slog.Error("failed to get banner id: %w", err)
 		os.Exit(1)
 	}
 	fmt.Println(id)
+	fmt.Println("finish create")
 
-	time.Sleep(15 * time.Second)
+	fmt.Println("start update")
+	time.Sleep(7 * time.Second)
 
-	err = storage.UpdateBanner(id, 1, []int{2, 3}, "sads", false)
+	// Test update banner
+	err = storage.UpdateBanner(id, 1, []int{2, 3}, `{"sdsd3": "sdsda2"}`, false)
 	if err != nil {
 		slog.Error("failed to get banner id: %w", err)
 		os.Exit(1)
 	}
+	fmt.Println("finish update")
 
 	// TODO: router: go-chi
 
