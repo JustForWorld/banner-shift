@@ -295,27 +295,50 @@ func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
 	return content, nil
 }
 
-func (s *Storage) GetBannerList(featureID, tagI, limit, offset int64) ([]Banner, error) {
+func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]Banner, error) {
 	const op = "storage.postgresql.GetBannerList"
 
-	// get banner list
-	stmtGetBannerList, err := s.db.Prepare(`
+	// optional params in query
+	query := `
 		SELECT
 		b.*
 		FROM
 		banner b
-		LEFT JOIN banner_tag bt ON b.id = bt.banner_id
-		WHERE
-		b.feature_id = ($1)
-		AND bt.tag_id = ($2)
-		LIMIT ($3);
-	`)
+		LEFT JOIN banner_tag bt ON b.id = bt.banner_id	
+	`
+	var args []interface{}
+	cntArgs := 0
+
+	if featureID != 0 && tagID != 0 {
+		cntArgs++
+		query += fmt.Sprintf("WHERE b.feature_id = ($%v) AND", cntArgs)
+		args = append(args, featureID)
+		cntArgs++
+		query += fmt.Sprintf("bt.tag_id = ($%v)", cntArgs)
+		args = append(args, tagID)
+	} else if featureID != 0 {
+		cntArgs++
+		query += fmt.Sprintf("WHERE b.feature_id = ($%v)", cntArgs)
+		args = append(args, featureID)
+	} else if tagID != 0 {
+		cntArgs++
+		query += fmt.Sprintf("WHERE bt.tag_id = ($%v)", cntArgs)
+		args = append(args, tagID)
+	}
+	if limit != 0 {
+		cntArgs++
+		query += fmt.Sprintf("LIMIT ($%v);", cntArgs)
+		args = append(args, limit)
+	}
+
+	// get banner list
+	stmtGetBannerList, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	list := make([]Banner, 0, 1024)
-	rows, err := stmtGetBannerList.Query(featureID, tagI, limit)
+	rows, err := stmtGetBannerList.Query(args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
 	}
