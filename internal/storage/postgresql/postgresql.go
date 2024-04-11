@@ -14,10 +14,11 @@ type Storage struct {
 }
 
 type Banner struct {
-	id        uint64
+	id        int64
 	content   string
 	isActive  bool
-	featureID uint64
+	featureID int64
+	tagIDs    []int64
 	createdAT string
 	updatedAT string
 }
@@ -295,13 +296,14 @@ func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
 	return content, nil
 }
 
-func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]Banner, error) {
+func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banner, error) {
 	const op = "storage.postgresql.GetBannerList"
 
 	// optional params in query
 	query := `
 		SELECT
-		b.*
+		b.*,
+		bt.tag_id
 		FROM
 		banner b
 		LEFT JOIN banner_tag bt ON b.id = bt.banner_id	
@@ -337,25 +339,46 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]Banner
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	list := make([]Banner, 0, 1024)
 	rows, err := stmtGetBannerList.Query(args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
 	}
 	defer rows.Close()
 
+	bannerMap := make(map[int64]*Banner)
+
 	for rows.Next() {
 		var banner Banner
+		var currentTagID int64
 		// read the lines from the query result and add them to the list
-		if err := rows.Scan(&banner.id, &banner.content, &banner.isActive, &banner.featureID, &banner.createdAT, &banner.updatedAT); err != nil {
+		if err := rows.Scan(&banner.id, &banner.content, &banner.isActive, &banner.featureID, &banner.createdAT, &banner.updatedAT, &currentTagID); err != nil {
 			return nil, fmt.Errorf("%s: failed to scan rows: %w", op, err)
 		}
-		list = append(list, banner)
-	}
 
+		// check if a banner with this ID already exists
+		if existingBanner, found := bannerMap[banner.id]; found {
+			// if found, add a new tag_id
+			existingBanner.tagIDs = append(existingBanner.tagIDs, currentTagID)
+		} else {
+			// if you haven't found it, create a new banner
+			banner.tagIDs = append(banner.tagIDs, currentTagID)
+			bannerMap[banner.id] = &banner
+		}
+	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("%s: error during iteration: %w", op, err)
 	}
 
-	return list, nil
+	resultList := getBannerListFromMap(bannerMap)
+	return resultList, nil
+}
+
+func getBannerListFromMap(bannerMap map[int64]*Banner) []*Banner {
+	bannerList := make([]*Banner, 0, len(bannerMap))
+
+	for _, banner := range bannerMap {
+		bannerList = append(bannerList, banner)
+	}
+
+	return bannerList
 }
