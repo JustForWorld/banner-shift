@@ -22,7 +22,7 @@ type HTTPServer struct {
 }
 
 type PostgreSQL struct {
-	Host     string `yaml:"host" env-default:"postgres"`
+	Host     string `yaml:"host" env-default:"localhost"`
 	Port     int    `yaml:"port" env-default:"5432"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
