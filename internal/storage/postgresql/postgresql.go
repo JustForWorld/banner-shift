@@ -3,6 +3,7 @@ package postgresql
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/lib/pq"
@@ -259,4 +260,28 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
+	const op = "storage.postgresql.GetBanner"
+
+	// get banner
+	stmtGetBanner, err := s.db.Prepare(`
+		SELECT content FROM banner WHERE id = ($1) AND feature_id = ($2);
+	`)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	var content string
+	err = stmtGetBanner.QueryRow(bannerID, featureID).Scan(&content)
+	if err != nil {
+		// if not exist
+		if strings.Contains(err.Error(), "no rows in result set") {
+			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
+		}
+		return "", fmt.Errorf("%s: failed get content row: %w", op, err)
+	}
+
+	return content, nil
 }
