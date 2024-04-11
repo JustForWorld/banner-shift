@@ -61,7 +61,7 @@ func main() {
 	fmt.Println("------------------------------------")
 
 	fmt.Println("start update...")
-	time.Sleep(12 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// Test update banner
 	err = storage.UpdateBanner(id, 1, []int{2, 3, 4}, `{"sdsd3": "sdsda2"}`, false)
@@ -72,10 +72,16 @@ func main() {
 	fmt.Println("finish update")
 	fmt.Println("------------------------------------")
 
-	//Test delete banner
+	//Get banner (exist)
+	content, err := storage.GetBanner(id, 1)
+	if err != nil {
+		slog.Error("failed to get banner id: %w", err)
+		os.Exit(1)
+	}
+	fmt.Println(content)
 
 	fmt.Println("start delete...")
-	time.Sleep(12 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	err = storage.DeleteBanner(id)
 	if err != nil {
@@ -85,6 +91,15 @@ func main() {
 
 	fmt.Println("finish delete")
 	fmt.Println("------------------------------------")
+
+	//Get banner (not exist)
+	content, err = storage.GetBanner(id, 1)
+	fmt.Println(content)
+	if err != nil {
+		slog.Error("failed to get banner id: %w", err)
+		os.Exit(1)
+	}
+	fmt.Println(content)
 
 	// TODO: router: go-chi
 
