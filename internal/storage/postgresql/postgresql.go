@@ -275,6 +275,11 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
 	const op = "storage.postgresql.GetBanner"
 
+	// checking required fields
+	if bannerID == 0 || featureID == 0 {
+		return "", fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+	}
+
 	// get banner
 	stmtGetBanner, err := s.db.Prepare(`
 		SELECT content FROM banner WHERE id = ($1) AND feature_id = ($2);
