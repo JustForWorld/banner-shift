@@ -92,7 +92,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 
 	// create relations between banner < banner_tag tables
 	stmtRelBanner, err := db.Prepare(`
-		ALTER TABLE banner_tag ADD FOREIGN KEY (banner_id) REFERENCES banner (id);
+		ALTER TABLE banner_tag ADD FOREIGN KEY (banner_id) REFERENCES banner (id) ON DELETE CASCADE;
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create relation between banner < banner_tag: %s: %w", op, err)
@@ -102,23 +102,6 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("exec relation between banner < banner_tag: %s: %w", op, err)
 	}
-
-	// create references for cascade delete and update banner_tag and banner
-	// stmtCascadeBanner, err := db.Prepare(`
-	// 	ALTER TABLE banner_tag
-	// 	ADD FOREIGN KEY (banner_id)
-	// 	REFERENCES banner (id)
-	// 	ON DELETE CASCADE
-	// 	ON UPDATE CASCADE;
-	// `)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("create references for cascade delete and update banner_tag and banner: %s: %w", op, err)
-	// }
-
-	// _, err = stmtCascadeBanner.Exec()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("exec references for cascade delete and update banner_tag and banner: %s: %w", op, err)
-	// }
 
 	// create relations between banner > feature tables
 	stmtRelFeature, err := db.Prepare(`
@@ -242,6 +225,37 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 			}
 			return fmt.Errorf("%s: failed to update banner_tag row: %w", op, err)
 		}
+	}
+
+	return nil
+}
+
+func (s *Storage) DeleteBanner(bannerID int64) error {
+	const op = "storage.postgresql.DeleteBanner"
+
+	// delete banner
+	stmtDeleteBanner, err := s.db.Prepare(`
+		DELETE FROM banner
+		WHERE id = ($1);
+	`)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	result, err := stmtDeleteBanner.Exec(bannerID)
+	if err != nil {
+		return fmt.Errorf("%s: failed delete row: %w", op, err)
+	}
+
+	// cnt affected rows
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s: error getting rows affected: %w", op, err)
+	}
+
+	// check if exist banner
+	if rowsAffected == 0 {
+		return fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
 	}
 
 	return nil
