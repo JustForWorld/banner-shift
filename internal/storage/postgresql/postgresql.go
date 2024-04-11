@@ -13,6 +13,15 @@ type Storage struct {
 	db *sql.DB
 }
 
+type Banner struct {
+	id        uint64
+	content   string
+	isActive  bool
+	featureID uint64
+	createdAT string
+	updatedAT string
+}
+
 func New(user, password, host, dbname string, port int) (*Storage, error) {
 	const op = "storage.postgresql.New"
 
@@ -284,4 +293,46 @@ func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
 	}
 
 	return content, nil
+}
+
+func (s *Storage) GetBannerList(featureID, tagI, limit, offset int64) ([]Banner, error) {
+	const op = "storage.postgresql.GetBannerList"
+
+	// get banner list
+	stmtGetBannerList, err := s.db.Prepare(`
+		SELECT
+		b.*
+		FROM
+		banner b
+		LEFT JOIN banner_tag bt ON b.id = bt.banner_id
+		WHERE
+		b.feature_id = ($1)
+		AND bt.tag_id = ($2)
+		LIMIT ($3);
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	list := make([]Banner, 0, 1024)
+	rows, err := stmtGetBannerList.Query(featureID, tagI, limit)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var banner Banner
+		// read the lines from the query result and add them to the list
+		if err := rows.Scan(&banner.id, &banner.content, &banner.isActive, &banner.featureID, &banner.createdAT, &banner.updatedAT); err != nil {
+			return nil, fmt.Errorf("%s: failed to scan rows: %w", op, err)
+		}
+		list = append(list, banner)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: error during iteration: %w", op, err)
+	}
+
+	return list, nil
 }
