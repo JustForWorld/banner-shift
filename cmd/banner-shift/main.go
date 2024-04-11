@@ -67,7 +67,7 @@ func main() {
 	fmt.Println("------------------------------------")
 
 	fmt.Println("start update...")
-	time.Sleep(12 * time.Second)
+	time.Sleep(7 * time.Second)
 
 	// Test update banner
 	err = storage.UpdateBanner(id, 1, []int{2, 3, 4}, `{"qqq4": "q4q4"}`, false)
@@ -78,13 +78,15 @@ func main() {
 	fmt.Println("finish update")
 	fmt.Println("------------------------------------")
 
-	// Get banner list
-	list, err := storage.GetBannerList(3, 2, 10, 5)
+	// Get banner list (all banners)
+	list, err := storage.GetBannerList(0, 0, 10, 5)
 	if err != nil {
 		slog.Error("failed to get banner list: %w", err)
 		os.Exit(1)
 	}
-	fmt.Println(list)
+	for _, banner := range list {
+		fmt.Println(*banner)
+	}
 
 	//Get banner (exist)
 	// content, err := storage.GetBanner(id, 1)
