@@ -159,6 +159,11 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
+	// checking required fields
+	if featureID == 0 || content == "" || len(tagIDs) == 0 {
+		return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+	}
+
 	// insert new banner
 	stmtNewBanner, err := s.db.Prepare(`
 		INSERT INTO banner(content, is_active, feature_id) VALUES($1, $2, $3) RETURNING id
