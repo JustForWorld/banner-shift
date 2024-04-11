@@ -51,26 +51,26 @@ func main() {
 		slog.Error("failed to create banner: %w", err)
 		os.Exit(1)
 	}
-	_, err = storage.CreateBanner(2, []int{2, 4}, `{"qqq2": "q2q2q"}`, true)
-	if err != nil {
-		slog.Error("failed to create banner: %w", err)
-		os.Exit(1)
-	}
+	// _, err = storage.CreateBanner(2, []int{2, 4}, `{"qqq2": "q2q2q"}`, true)
+	// if err != nil {
+	// 	slog.Error("failed to create banner: %w", err)
+	// 	os.Exit(1)
+	// }
 
-	_, err = storage.CreateBanner(3, []int{1, 2}, `{"qqq3": "q3q3q"}`, true)
-	if err != nil {
-		slog.Error("failed to create banner: %w", err)
-		os.Exit(1)
-	}
+	// _, err = storage.CreateBanner(3, []int{1, 2}, `{"qqq3": "q3q3q"}`, true)
+	// if err != nil {
+	// 	slog.Error("failed to create banner: %w", err)
+	// 	os.Exit(1)
+	// }
 	fmt.Println(id)
 	fmt.Println("finish create")
 	fmt.Println("------------------------------------")
 
 	fmt.Println("start update...")
-	time.Sleep(7 * time.Second)
+	time.Sleep(15 * time.Second)
 
-	// Test update banner
-	err = storage.UpdateBanner(id, 1, []int{2, 3, 4}, `{"qqq4": "q4q4"}`, false)
+	// Test update banner (with empty request body)
+	err = storage.UpdateBanner(id, 0, []int{}, "", "")
 	if err != nil {
 		slog.Error("failed to update banner: %w", err)
 		os.Exit(1)
@@ -79,16 +79,16 @@ func main() {
 	fmt.Println("------------------------------------")
 
 	// Get banner list (all banners)
-	list, err := storage.GetBannerList(0, 0, 10, 5)
-	if err != nil {
-		slog.Error("failed to get banner list: %w", err)
-		os.Exit(1)
-	}
-	for _, banner := range list {
-		fmt.Println(*banner)
-	}
+	// list, err := storage.GetBannerList(0, 0, 10, 5)
+	// if err != nil {
+	// 	slog.Error("failed to get banner list: %w", err)
+	// 	os.Exit(1)
+	// }
+	// for _, banner := range list {
+	// 	fmt.Println(*banner)
+	// }
 
-	//Get banner (exist)
+	// Get banner (exist)
 	// content, err := storage.GetBanner(id, 1)
 	// if err != nil {
 	// 	slog.Error("failed to get banner id: %w", err)
