@@ -16,7 +16,7 @@ type Storage struct {
 type Banner struct {
 	id        int64
 	content   string
-	isActive  bool
+	isActive  string
 	featureID int64
 	tagIDs    []int64
 	createdAT string
@@ -202,24 +202,63 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	return bannerID, nil
 }
 
-func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content string, isActive bool) error {
+func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content string, isActive interface{}) error {
 	const op = "storage.postgresql.UpdateBanner"
 
+	// optional params in query
+	query := `UPDATE banner SET updated_at = CURRENT_TIMESTAMP `
+	var args []interface{}
+	cntArgs := 0
+	queryRow := make([]string, 1, 4)
+	queryRow[0] = ", "
+	var queryParams string
+
+	if content != "" {
+		cntArgs++
+		queryRow = append(queryRow, fmt.Sprintf("content = ($%v)", cntArgs))
+		args = append(args, content)
+	}
+	switch v := isActive.(type) {
+	case bool:
+		isActiveBool := v
+		cntArgs++
+		queryRow = append(queryRow, fmt.Sprintf("is_active = ($%v)", cntArgs))
+		args = append(args, isActiveBool)
+	case string:
+		currentV := v
+		if currentV != "" {
+			return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+		}
+	default:
+		return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+	}
+	if featureID != 0 {
+		cntArgs++
+		queryRow = append(queryRow, fmt.Sprintf("feature_id = ($%v)", cntArgs))
+		args = append(args, featureID)
+	}
+	if len(queryRow) > 1 {
+		queryParams = strings.Join(queryRow[1:], ", ")
+		queryParams = ", " + queryParams
+		query += queryParams
+	}
+	args = append(args, bannerID)
+	cntArgs++
+	query += fmt.Sprintf(` WHERE id = ($%v);`, cntArgs)
+
 	// update banner
-	stmtUpdateBanner, err := s.db.Prepare(`
-		UPDATE banner
-		SET content = ($1), is_active = ($2), feature_id = ($3), updated_at = CURRENT_TIMESTAMP
-		WHERE id = ($4);
-	`)
+	stmtUpdateBanner, err := s.db.Prepare(query)
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		fmt.Println(query)
+		return fmt.Errorf(" %s: %w", op, err)
 	}
 
-	_, err = stmtUpdateBanner.Exec(content, isActive, featureID, bannerID)
+	_, err = stmtUpdateBanner.Exec(args...)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
 			return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 		}
+		fmt.Println(query)
 		return fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
 	}
 
