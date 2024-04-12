@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
+	delete_banner "github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/delete"
 	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/get"
 	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/save"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
@@ -48,6 +49,7 @@ func main() {
 
 	router.Post("/banner", save.New(log, storage))
 	router.Get("/banner", get.New(log, storage))
+	router.Delete("/banner/{id}", delete_banner.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 	server := &http.Server{
