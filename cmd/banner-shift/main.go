@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
+	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/save"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -16,10 +17,6 @@ const (
 	envDev   = "dev"
 	envProd  = "prod"
 )
-
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "<h1>Test OK!</h1>")
-}
 
 func main() {
 	cfg := config.MustLoad()
@@ -40,12 +37,29 @@ func main() {
 		slog.Error("failed to init storage: %w", err)
 		os.Exit(1)
 	}
-	_ = storage
 
-	_ = chi.NewRouter()
+	router := chi.NewRouter()
 
-	http.HandleFunc("/", testHandler)
-	http.ListenAndServe(":8080", nil)
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.URLFormat)
+
+	router.Post("/banner", save.New(log, storage))
+
+	log.Info("starting server", slog.String("address", cfg.Address))
+	server := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
+	log.Info("server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
