@@ -156,7 +156,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isActive bool) (int64, error) {
+func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content string, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
 	// checking required fields
