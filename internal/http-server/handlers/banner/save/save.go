@@ -57,7 +57,8 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 		}
 		log.Info("request body decoded", slog.Any("request", req))
 
-		id, err := bannerSaver.CreateBanner(req.FeatureID, req.TagIDs, req.Content, req.IsActive)
+		var res Response
+		res.BannerID, err = bannerSaver.CreateBanner(req.FeatureID, req.TagIDs, req.Content, req.IsActive)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
 			log.Info("banner with invalid fata", log.With(
 				slog.Any("feature_id", req.FeatureID),
@@ -79,9 +80,9 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 			return
 		}
 
-		log.Info("banner created", slog.Int64("id", id))
+		log.Info("banner created", slog.Int64("id", res.BannerID))
 
 		render.Status(r, 201)
-		render.JSON(w, r, resp.OK())
+		render.JSON(w, r, res.BannerID)
 	}
 }
