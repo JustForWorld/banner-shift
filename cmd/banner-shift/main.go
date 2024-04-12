@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
+	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/get"
 	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/save"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
 	"github.com/go-chi/chi/middleware"
@@ -46,6 +47,7 @@ func main() {
 	router.Use(middleware.URLFormat)
 
 	router.Post("/banner", save.New(log, storage))
+	router.Get("/banner", get.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 	server := &http.Server{
