@@ -19,7 +19,7 @@ type Request struct {
 
 type Response struct {
 	resp.Response
-	BannerID int64 `json:"banner_id"`
+	Content string `json:"content"`
 }
 
 type BannerGetter interface {
@@ -58,7 +58,8 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 		}
 		log.Info("request query parameter is valid", slog.Any("request", req))
 
-		content, err := bannerGetter.GetBanner(req.TagID, req.FeatureID)
+		var res Response
+		res.Content, err = bannerGetter.GetBanner(req.TagID, req.FeatureID)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
 			log.Info("banner with invalid fata", log.With(
 				slog.Any("feature_id", req.FeatureID),
@@ -87,9 +88,9 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 			return
 		}
 
-		log.Info("banner found", slog.Any("content", content))
+		log.Info("banner found", slog.Any("content", res.Content))
 
 		render.Status(r, 200)
-		render.JSON(w, r, content)
+		render.JSON(w, r, res.Content)
 	}
 }
