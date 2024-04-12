@@ -321,28 +321,31 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	return nil
 }
 
-func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
+func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
 	const op = "storage.postgresql.GetBanner"
 
 	// checking required fields
-	if bannerID == 0 || featureID == 0 {
+	if tagID == 0 || featureID == 0 {
 		return "", fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
 
 	// get banner
 	stmtGetBanner, err := s.db.Prepare(`
-		SELECT content FROM banner WHERE id = ($1) AND feature_id = ($2);
+        SELECT b.content
+        FROM banner b
+        JOIN banner_tag bt ON b.id = bt.banner_id
+        WHERE b.feature_id = $1 AND bt.tag_id = $2;
 	`)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
 	var content string
-	err = stmtGetBanner.QueryRow(bannerID, featureID).Scan(&content)
+	err = stmtGetBanner.QueryRow(featureID, tagID).Scan(&content)
 	if err != nil {
 		// if not exist
 		if strings.Contains(err.Error(), "no rows in result set") {
-			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
+			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotFound)
 		}
 		return "", fmt.Errorf("%s: failed get content row: %w", op, err)
 	}
