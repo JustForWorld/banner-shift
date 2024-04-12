@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,7 +16,7 @@ type Storage struct {
 
 type Banner struct {
 	id        int64
-	content   string
+	content   interface{}
 	isActive  string
 	featureID int64
 	tagIDs    []int64
@@ -156,11 +157,11 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content string, isActive bool) (int64, error) {
+func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
 	// checking required fields
-	if featureID == 0 || content == "" || len(tagIDs) == 0 {
+	if featureID == 0 || content == nil || len(tagIDs) == 0 {
 		return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
 
@@ -173,9 +174,13 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content string, is
 	}
 
 	var bannerID int64
-	err = stmtNewBanner.QueryRow(content, isActive, featureID).Scan(&bannerID)
+	contentBytes, err := json.Marshal(content)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+	err = stmtNewBanner.QueryRow(contentBytes, isActive, featureID).Scan(&bannerID)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
 			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 		}
 		return 0, fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
