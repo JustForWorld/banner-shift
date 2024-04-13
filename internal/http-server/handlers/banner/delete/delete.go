@@ -9,8 +9,8 @@ import (
 
 	resp "github.com/JustForWorld/banner-shift/internal/http-server/handlers"
 	"github.com/JustForWorld/banner-shift/internal/storage"
-	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
 

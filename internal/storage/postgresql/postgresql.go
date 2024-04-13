@@ -178,6 +178,7 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmtNewBanner.Close()
 
 	var bannerID int64
 	contentBytes, err := json.Marshal(content)
@@ -305,6 +306,17 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 func (s *Storage) DeleteBanner(bannerID int64) error {
 	const op = "storage.postgresql.DeleteBanner"
 
+	// checking required field
+	if bannerID == 0 {
+		return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("%s: failed to start transaction: %w", op, err)
+	}
+	defer tx.Rollback()
+
 	// delete banner
 	stmtDeleteBanner, err := s.db.Prepare(`
 		DELETE FROM banner
@@ -313,9 +325,11 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmtDeleteBanner.Close()
 
-	result, err := stmtDeleteBanner.Exec(bannerID)
+	result, err := tx.Stmt(stmtDeleteBanner).Exec(bannerID)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: failed delete row: %w", op, err)
 	}
 
@@ -328,6 +342,10 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	// check if exist banner
 	if rowsAffected == 0 {
 		return fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%s: failed to commit transaction: %w", op, err)
 	}
 
 	return nil
