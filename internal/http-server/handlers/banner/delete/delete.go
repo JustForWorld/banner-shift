@@ -51,7 +51,6 @@ func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
 		log.Info("path parameter is valid", slog.Any("request", req))
 
 		err = bannerRemove.DeleteBanner(req.ID)
-		log.Info(err.Error())
 		if errors.Is(err, storage.ErrBannerNotExists) {
 			log.Info("banner not found", log.With(
 				slog.Any("banner_id", req.ID),

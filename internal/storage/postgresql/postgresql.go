@@ -424,7 +424,7 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 
 	if featureID != 0 && tagID != 0 {
 		cntArgs++
-		query += fmt.Sprintf("WHERE b.feature_id = ($%v) AND", cntArgs)
+		query += fmt.Sprintf("WHERE b.feature_id = ($%v) AND ", cntArgs)
 		args = append(args, featureID)
 		cntArgs++
 		query += fmt.Sprintf("bt.tag_id = ($%v)", cntArgs)
@@ -461,10 +461,13 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 	for rows.Next() {
 		var banner Banner
 		var currentTagID int64
+		// var contentJSON []byte
 		// read the lines from the query result and add them to the list
-		if err := rows.Scan(&banner.BannerID, &banner.Content, &banner.IsActive, &banner.FeatureID, &banner.CreatedAT, &banner.UpdatedAT, &currentTagID); err != nil {
+		var stringContent string
+		if err := rows.Scan(&banner.BannerID, &stringContent, &banner.IsActive, &banner.FeatureID, &banner.CreatedAT, &banner.UpdatedAT, &currentTagID); err != nil {
 			return nil, fmt.Errorf("%s: failed to scan rows: %w", op, err)
 		}
+		banner.Content = stringContent
 
 		// check if a banner with this ID already exists
 		if existingBanner, found := bannerMap[banner.BannerID]; found {
