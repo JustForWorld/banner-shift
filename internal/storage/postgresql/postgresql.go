@@ -15,13 +15,13 @@ type Storage struct {
 }
 
 type Banner struct {
-	id        int64
-	content   interface{}
-	isActive  string
-	featureID int64
-	tagIDs    []int64
-	createdAT string
-	updatedAT string
+	BannerID  int64       `json:"banner_id"`
+	TagIDs    []int64     `json:"tag_ids"`
+	FeatureID int64       `json:"feature_id"`
+	Content   interface{} `json:"content"`
+	IsActive  string      `json:"is_active"`
+	CreatedAT string      `json:"created_at"`
+	UpdatedAT string      `json:"updated_at"`
 }
 
 func New(user, password, host, dbname string, port int) (*Storage, error) {
@@ -165,6 +165,12 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 		return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to start transaction: %w", op, err)
+	}
+	defer tx.Rollback()
+
 	// insert new banner
 	stmtNewBanner, err := s.db.Prepare(`
 		INSERT INTO banner(content, is_active, feature_id) VALUES($1, $2, $3) RETURNING id
@@ -178,7 +184,7 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
-	err = stmtNewBanner.QueryRow(contentBytes, isActive, featureID).Scan(&bannerID)
+	err = tx.Stmt(stmtNewBanner).QueryRow(contentBytes, isActive, featureID).Scan(&bannerID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
 			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
@@ -195,13 +201,19 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
 
-		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
+		_, err = tx.Stmt(stmtNewBannerTag).Exec(bannerID, tagID, featureID)
 		if err != nil {
+			tx.Rollback()
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
 				return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
 			}
 			return 0, fmt.Errorf("%s: failed to add banner_tag row: %w", op, err)
 		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to commit transaction: %w", op, err)
 	}
 
 	return bannerID, nil
@@ -408,18 +420,18 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 		var banner Banner
 		var currentTagID int64
 		// read the lines from the query result and add them to the list
-		if err := rows.Scan(&banner.id, &banner.content, &banner.isActive, &banner.featureID, &banner.createdAT, &banner.updatedAT, &currentTagID); err != nil {
+		if err := rows.Scan(&banner.BannerID, &banner.Content, &banner.IsActive, &banner.FeatureID, &banner.CreatedAT, &banner.UpdatedAT, &currentTagID); err != nil {
 			return nil, fmt.Errorf("%s: failed to scan rows: %w", op, err)
 		}
 
 		// check if a banner with this ID already exists
-		if existingBanner, found := bannerMap[banner.id]; found {
+		if existingBanner, found := bannerMap[banner.BannerID]; found {
 			// if found, add a new tag_id
-			existingBanner.tagIDs = append(existingBanner.tagIDs, currentTagID)
+			existingBanner.TagIDs = append(existingBanner.TagIDs, currentTagID)
 		} else {
 			// if you haven't found it, create a new banner
-			banner.tagIDs = append(banner.tagIDs, currentTagID)
-			bannerMap[banner.id] = &banner
+			banner.TagIDs = append(banner.TagIDs, currentTagID)
+			bannerMap[banner.BannerID] = &banner
 		}
 	}
 	if err := rows.Err(); err != nil {
