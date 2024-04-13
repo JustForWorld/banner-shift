@@ -223,6 +223,26 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error {
 	const op = "storage.postgresql.UpdateBanner"
 
+	// Check if feature_id has changed
+	var existingFeatureID int64
+	err := s.db.QueryRow(`SELECT feature_id FROM banner WHERE id = $1`, bannerID).Scan(&existingFeatureID)
+	if err != nil {
+		return fmt.Errorf("%s: failed to get existing feature_id: %w", op, err)
+	}
+
+	if existingFeatureID != featureID {
+		// Delete existing banner_tag entries for the given banner_id and existingFeatureID
+		stmtDeleteBannerTags, err := s.db.Prepare(`DELETE FROM banner_tag WHERE banner_id = $1 AND feature_id = $2`)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		_, err = stmtDeleteBannerTags.Exec(bannerID, existingFeatureID)
+		if err != nil {
+			return fmt.Errorf("%s: failed to delete existing banner_tag entries: %w", op, err)
+		}
+	}
+
 	// optional params in query
 	query := `UPDATE banner SET updated_at = CURRENT_TIMESTAMP `
 	var args []interface{}
