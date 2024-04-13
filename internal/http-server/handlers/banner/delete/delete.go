@@ -40,8 +40,6 @@ func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
 			err error
 		)
 		req.ID, err = strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-		// TODO: remove
-		fmt.Printf("%T, %T %v\n", req.ID, err, req.ID)
 		if err != nil {
 			log.Error("request path parameter id is not integer")
 			fmt.Println(chi.URLParam(r, "id"))
@@ -74,7 +72,6 @@ func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
 
 		log.Info("banner removed", slog.Any("id", req.ID))
 
-		render.Status(r, 204)
-		render.JSON(w, r, nil)
+		fmt.Fprintln(w, http.StatusNoContent)
 	}
 }

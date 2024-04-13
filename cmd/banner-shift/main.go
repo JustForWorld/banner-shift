@@ -10,6 +10,7 @@ import (
 	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/get"
 	getlist "github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/get-list"
 	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/save"
+	"github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/update"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
@@ -48,10 +49,12 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Post("/banner", save.New(log, storage))
-	router.Get("/user_banner", get.New(log, storage))
-	router.Delete("/banner/{id}", delete_banner.New(log, storage))
 	router.Get("/banner", getlist.New(log, storage))
+	router.Get("/user_banner", get.New(log, storage))
+
+	router.Post("/banner", save.New(log, storage))
+	router.Patch("/banner/{id}", update.New(log, storage))
+	router.Delete("/banner/{id}", delete_banner.New(log, storage))
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 	server := &http.Server{

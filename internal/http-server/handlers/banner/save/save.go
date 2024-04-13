@@ -11,7 +11,6 @@ import (
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
-	// "github.com/knadh/koanf/parsers/json"
 )
 
 type Request struct {
@@ -62,7 +61,7 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 		var res Response
 		res.BannerID, err = bannerSaver.CreateBanner(req.FeatureID, req.TagIDs, req.Content, req.IsActive)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
-			log.Info("banner with invalid fata", log.With(
+			log.Info("banner with invalid data", log.With(
 				slog.Any("feature_id", req.FeatureID),
 				slog.Any("tag_ids", req.TagIDs),
 				slog.Any("content", req.Content),
