@@ -2,6 +2,7 @@ package save
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
+	// "github.com/knadh/koanf/parsers/json"
 )
 
 type Request struct {
@@ -71,8 +73,21 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 			render.JSON(w, r, resp.Error("Некорректные данные"))
 			return
 		}
+		if errors.Is(err, storage.ErrBannerExists) {
+			log.Info("banner exists", log.With(
+				slog.Any("feature_id", req.FeatureID),
+				slog.Any("tag_ids", req.TagIDs),
+				slog.Any("content", req.Content),
+				slog.Any("is_active", req.IsActive),
+			))
+
+			render.Status(r, 409)
+			render.JSON(w, r, resp.Error("Баннер уже существует"))
+			return
+		}
 
 		if err != nil {
+			fmt.Println(err)
 			log.Error("failed to create banner", err)
 
 			render.Status(r, 500)
@@ -83,6 +98,7 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 		log.Info("banner created", slog.Int64("id", res.BannerID))
 
 		render.Status(r, 201)
-		render.JSON(w, r, res.BannerID)
+		w.Header().Set("Content-Type", "application/json")
+		render.JSON(w, r, fmt.Sprintf(`{"banner_id": %v}`, res.BannerID))
 	}
 }
