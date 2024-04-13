@@ -220,7 +220,7 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 	return bannerID, nil
 }
 
-func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content string, isActive interface{}) error {
+func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error {
 	const op = "storage.postgresql.UpdateBanner"
 
 	// optional params in query
@@ -231,10 +231,14 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 	queryRow[0] = ", "
 	var queryParams string
 
-	if content != "" {
+	if content != nil {
+		contentBytes, err := json.Marshal(content)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
 		cntArgs++
 		queryRow = append(queryRow, fmt.Sprintf("content = ($%v)", cntArgs))
-		args = append(args, content)
+		args = append(args, contentBytes)
 	}
 	switch v := isActive.(type) {
 	case bool:
