@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -14,13 +15,13 @@ type Storage struct {
 }
 
 type Banner struct {
-	id        int64
-	content   string
-	isActive  string
-	featureID int64
-	tagIDs    []int64
-	createdAT string
-	updatedAT string
+	BannerID  int64       `json:"banner_id"`
+	TagIDs    []int64     `json:"tag_ids"`
+	FeatureID int64       `json:"feature_id"`
+	Content   interface{} `json:"content"`
+	IsActive  string      `json:"is_active"`
+	CreatedAT string      `json:"created_at"`
+	UpdatedAT string      `json:"updated_at"`
 }
 
 func New(user, password, host, dbname string, port int) (*Storage, error) {
@@ -156,13 +157,19 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isActive bool) (int64, error) {
+func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
 	// checking required fields
-	if featureID == 0 || content == "" || len(tagIDs) == 0 {
+	if featureID == 0 || content == nil || len(tagIDs) == 0 {
 		return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to start transaction: %w", op, err)
+	}
+	defer tx.Rollback()
 
 	// insert new banner
 	stmtNewBanner, err := s.db.Prepare(`
@@ -171,11 +178,16 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmtNewBanner.Close()
 
 	var bannerID int64
-	err = stmtNewBanner.QueryRow(content, isActive, featureID).Scan(&bannerID)
+	contentBytes, err := json.Marshal(content)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+	err = tx.Stmt(stmtNewBanner).QueryRow(contentBytes, isActive, featureID).Scan(&bannerID)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
 			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 		}
 		return 0, fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
@@ -190,8 +202,9 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
 
-		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
+		_, err = tx.Stmt(stmtNewBannerTag).Exec(bannerID, tagID, featureID)
 		if err != nil {
+			tx.Rollback()
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
 				return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
 			}
@@ -199,11 +212,36 @@ func (s *Storage) CreateBanner(featureID int, tagIDs []int, content string, isAc
 		}
 	}
 
+	err = tx.Commit()
+	if err != nil {
+		return 0, fmt.Errorf("%s: failed to commit transaction: %w", op, err)
+	}
+
 	return bannerID, nil
 }
 
-func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content string, isActive interface{}) error {
+func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error {
 	const op = "storage.postgresql.UpdateBanner"
+
+	// Check if feature_id has changed
+	var existingFeatureID int64
+	err := s.db.QueryRow(`SELECT feature_id FROM banner WHERE id = $1`, bannerID).Scan(&existingFeatureID)
+	if err != nil {
+		return fmt.Errorf("%s: failed to get existing feature_id: %w", op, err)
+	}
+
+	if existingFeatureID != featureID {
+		// Delete existing banner_tag entries for the given banner_id and existingFeatureID
+		stmtDeleteBannerTags, err := s.db.Prepare(`DELETE FROM banner_tag WHERE banner_id = $1 AND feature_id = $2`)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		_, err = stmtDeleteBannerTags.Exec(bannerID, existingFeatureID)
+		if err != nil {
+			return fmt.Errorf("%s: failed to delete existing banner_tag entries: %w", op, err)
+		}
+	}
 
 	// optional params in query
 	query := `UPDATE banner SET updated_at = CURRENT_TIMESTAMP `
@@ -213,10 +251,14 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 	queryRow[0] = ", "
 	var queryParams string
 
-	if content != "" {
+	if content != nil {
+		contentBytes, err := json.Marshal(content)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
 		cntArgs++
 		queryRow = append(queryRow, fmt.Sprintf("content = ($%v)", cntArgs))
-		args = append(args, content)
+		args = append(args, contentBytes)
 	}
 	switch v := isActive.(type) {
 	case bool:
@@ -288,6 +330,17 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 func (s *Storage) DeleteBanner(bannerID int64) error {
 	const op = "storage.postgresql.DeleteBanner"
 
+	// checking required field
+	if bannerID == 0 {
+		return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("%s: failed to start transaction: %w", op, err)
+	}
+	defer tx.Rollback()
+
 	// delete banner
 	stmtDeleteBanner, err := s.db.Prepare(`
 		DELETE FROM banner
@@ -296,9 +349,11 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
+	defer stmtDeleteBanner.Close()
 
-	result, err := stmtDeleteBanner.Exec(bannerID)
+	result, err := tx.Stmt(stmtDeleteBanner).Exec(bannerID)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("%s: failed delete row: %w", op, err)
 	}
 
@@ -313,31 +368,38 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 		return fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
 	}
 
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%s: failed to commit transaction: %w", op, err)
+	}
+
 	return nil
 }
 
-func (s *Storage) GetBanner(bannerID, featureID int64) (string, error) {
+func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
 	const op = "storage.postgresql.GetBanner"
 
 	// checking required fields
-	if bannerID == 0 || featureID == 0 {
+	if tagID == 0 || featureID == 0 {
 		return "", fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
 
 	// get banner
 	stmtGetBanner, err := s.db.Prepare(`
-		SELECT content FROM banner WHERE id = ($1) AND feature_id = ($2);
+        SELECT b.content
+        FROM banner b
+        JOIN banner_tag bt ON b.id = bt.banner_id
+        WHERE b.feature_id = $1 AND bt.tag_id = $2;
 	`)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
 	var content string
-	err = stmtGetBanner.QueryRow(bannerID, featureID).Scan(&content)
+	err = stmtGetBanner.QueryRow(featureID, tagID).Scan(&content)
 	if err != nil {
 		// if not exist
 		if strings.Contains(err.Error(), "no rows in result set") {
-			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
+			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotFound)
 		}
 		return "", fmt.Errorf("%s: failed get content row: %w", op, err)
 	}
@@ -362,7 +424,7 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 
 	if featureID != 0 && tagID != 0 {
 		cntArgs++
-		query += fmt.Sprintf("WHERE b.feature_id = ($%v) AND", cntArgs)
+		query += fmt.Sprintf("WHERE b.feature_id = ($%v) AND ", cntArgs)
 		args = append(args, featureID)
 		cntArgs++
 		query += fmt.Sprintf("bt.tag_id = ($%v)", cntArgs)
@@ -399,19 +461,22 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 	for rows.Next() {
 		var banner Banner
 		var currentTagID int64
+		// var contentJSON []byte
 		// read the lines from the query result and add them to the list
-		if err := rows.Scan(&banner.id, &banner.content, &banner.isActive, &banner.featureID, &banner.createdAT, &banner.updatedAT, &currentTagID); err != nil {
+		var stringContent string
+		if err := rows.Scan(&banner.BannerID, &stringContent, &banner.IsActive, &banner.FeatureID, &banner.CreatedAT, &banner.UpdatedAT, &currentTagID); err != nil {
 			return nil, fmt.Errorf("%s: failed to scan rows: %w", op, err)
 		}
+		banner.Content = stringContent
 
 		// check if a banner with this ID already exists
-		if existingBanner, found := bannerMap[banner.id]; found {
+		if existingBanner, found := bannerMap[banner.BannerID]; found {
 			// if found, add a new tag_id
-			existingBanner.tagIDs = append(existingBanner.tagIDs, currentTagID)
+			existingBanner.TagIDs = append(existingBanner.TagIDs, currentTagID)
 		} else {
 			// if you haven't found it, create a new banner
-			banner.tagIDs = append(banner.tagIDs, currentTagID)
-			bannerMap[banner.id] = &banner
+			banner.TagIDs = append(banner.TagIDs, currentTagID)
+			bannerMap[banner.BannerID] = &banner
 		}
 	}
 	if err := rows.Err(); err != nil {
