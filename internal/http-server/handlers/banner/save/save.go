@@ -9,6 +9,7 @@ import (
 
 	resp "github.com/JustForWorld/banner-shift/internal/http-server/handlers"
 	"github.com/JustForWorld/banner-shift/internal/storage"
+	"github.com/JustForWorld/banner-shift/internal/storage/redis"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
@@ -27,10 +28,10 @@ type Response struct {
 }
 
 type BannerSaver interface {
-	CreateBanner(featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error)
+	CreateBanner(redis *redis.Storage, featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error)
 }
 
-func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
+func New(log *slog.Logger, bannerSaver BannerSaver, redis *redis.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.banner.save.New"
 
@@ -68,7 +69,7 @@ func New(log *slog.Logger, bannerSaver BannerSaver) http.HandlerFunc {
 		log.Info("request body decoded", slog.Any("request", req))
 
 		var res Response
-		res.BannerID, err = bannerSaver.CreateBanner(req.FeatureID, req.TagIDs, req.Content, req.IsActive)
+		res.BannerID, err = bannerSaver.CreateBanner(redis, req.FeatureID, req.TagIDs, req.Content, req.IsActive)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
 			log.Info("banner with invalid data", log.With(
 				slog.Any("feature_id", req.FeatureID),

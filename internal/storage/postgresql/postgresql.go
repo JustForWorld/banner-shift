@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/JustForWorld/banner-shift/internal/storage"
+	"github.com/JustForWorld/banner-shift/internal/storage/redis"
 	"github.com/lib/pq"
 )
 
@@ -31,7 +32,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 
 	db, err := sql.Open("postgres", psqlconn)
 	if err != nil {
-		return nil, fmt.Errorf("1: %s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	// create banner table
@@ -157,7 +158,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error) {
+func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
 	// checking required fields
@@ -201,6 +202,7 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 		if err != nil {
 			return 0, fmt.Errorf("%s: %w", op, err)
 		}
+		defer stmtNewBannerTag.Close()
 
 		_, err = tx.Stmt(stmtNewBannerTag).Exec(bannerID, tagID, featureID)
 		if err != nil {
@@ -209,6 +211,13 @@ func (s *Storage) CreateBanner(featureID int64, tagIDs []int, content interface{
 				return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerExists)
 			}
 			return 0, fmt.Errorf("%s: failed to add banner_tag row: %w", op, err)
+		}
+
+		// insert data to redis
+		err = redis.SetBanner(int64(tagID), featureID, content)
+		if err != nil {
+			tx.Rollback()
+			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerNotAdd)
 		}
 	}
 
