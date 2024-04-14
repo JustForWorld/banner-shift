@@ -62,9 +62,9 @@ func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
 
 		err = bannerRemove.DeleteBanner(r.Context(), req.ID)
 		if errors.Is(err, storage.ErrBannerNotExists) {
-			log.Info("banner not found", log.With(
+			log.Info("banner not found",
 				slog.Any("banner_id", req.ID),
-			))
+			)
 
 			// TODO: check user tag in banner tags
 			render.Status(r, 404)

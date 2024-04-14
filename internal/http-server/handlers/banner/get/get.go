@@ -86,20 +86,20 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 		var res Response
 		res.Content, err = bannerGetter.GetBanner(r.Context(), req.TagID, req.FeatureID)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
-			log.Info("banner with invalid fata", log.With(
+			log.Info("banner with invalid fata",
 				slog.Any("feature_id", req.FeatureID),
 				slog.Any("tag_id", req.TagID),
-			))
+			)
 
 			render.Status(r, 400)
 			render.JSON(w, r, resp.Error("Некорректные данные"))
 			return
 		}
 		if errors.Is(err, storage.ErrBannerNotFound) {
-			log.Info("banner not found", log.With(
+			log.Info("banner not found",
 				slog.Any("feature_id", req.FeatureID),
 				slog.Any("tag_id", req.TagID),
-			))
+			)
 
 			render.Status(r, 404)
 			render.JSON(w, r, resp.Error(fmt.Sprintf("Баннер для %v не найден", claims["username"])))

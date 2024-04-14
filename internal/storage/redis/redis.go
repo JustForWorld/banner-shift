@@ -9,11 +9,10 @@ import (
 )
 
 type Storage struct {
-	db  *redis.Client
-	ctx context.Context
+	db *redis.Client
 }
 
-func New(addr, user, password string, db, protocol int) (*Storage, error) {
+func New(ctx context.Context, addr, user, password string, db, protocol int) (*Storage, error) {
 	const op = "storage.redis.New"
 
 	url := fmt.Sprintf("redis://%v:%v@%v/%v?protocol=%v", user, password, addr, db, protocol)
@@ -23,14 +22,19 @@ func New(addr, user, password string, db, protocol int) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &Storage{db: redis.NewClient(opts)}, nil
+	dbm := redis.NewClient(opts)
+	if status := dbm.Ping(ctx); status.Err() != nil {
+		return nil, status.Err()
+	}
+
+	return &Storage{db: dbm}, nil
 }
 
-func (s *Storage) SetBanner(tagID, featureID int64, content interface{}) error {
+func (s *Storage) SetBanner(ctx context.Context, tagID, featureID int64, content []byte) error {
 	const op = "storage.redis.SetBanner"
 
-	key := fmt.Sprintf("banner:%d:%d", tagID, featureID)
-	err := s.db.Set(s.ctx, key, content, 0).Err()
+	key := fmt.Sprintf("%d:%d", tagID, featureID)
+	err := s.db.Set(ctx, key, content, 0).Err()
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}

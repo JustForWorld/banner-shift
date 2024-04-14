@@ -89,24 +89,24 @@ func New(log *slog.Logger, bannerUpdater BannerUpdater) http.HandlerFunc {
 
 		err = bannerUpdater.UpdateBanner(r.Context(), req.BannerID, req.Banner.FeatureID, req.Banner.TagIDs, req.Banner.Content, req.Banner.IsActive)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
-			log.Info("banner with invalid data", log.With(
+			log.Info("banner with invalid data",
 				slog.Any("feature_id", req.Banner.FeatureID),
 				slog.Any("tag_ids", req.Banner.TagIDs),
 				slog.Any("content", req.Banner.Content),
 				slog.Any("is_active", req.Banner.IsActive),
-			))
+			)
 
 			render.Status(r, 400)
 			render.JSON(w, r, resp.Error("Некорректные данные"))
 			return
 		}
 		if errors.Is(err, storage.ErrBannerNotExists) {
-			log.Info("banner not exists", log.With(
+			log.Info("banner not exists",
 				slog.Any("feature_id", req.Banner.FeatureID),
 				slog.Any("tag_ids", req.Banner.TagIDs),
 				slog.Any("content", req.Banner.Content),
 				slog.Any("is_active", req.Banner.IsActive),
-			))
+			)
 
 			render.Status(r, 404)
 			render.JSON(w, r, resp.Error("Баннер не найден"))
