@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/JustForWorld/banner-shift/internal/config"
 	delete_banner "github.com/JustForWorld/banner-shift/internal/http-server/handlers/banner/delete"
@@ -14,6 +16,7 @@ import (
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 const (
@@ -22,13 +25,21 @@ const (
 	envProd  = "prod"
 )
 
+var tokenAuth *jwtauth.JWTAuth
+
+func init() {
+	tokenAuth = jwtauth.New("HS256", []byte(fmt.Sprint(time.Now().Unix())), nil)
+}
+
 func main() {
-	cfg := config.MustLoad()
+	cfg, usr := config.MustLoad()
 
 	log := setupLogger(cfg.Env)
-
 	log.Info("starting banner-shift", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled")
+
+	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"username": usr.Username, "role": usr.Role, "tag": usr.Tag})
+	log.Debug("current jwt token", slog.String("jwt", tokenString))
 
 	storage, err := postgresql.New(
 		cfg.User,
@@ -49,12 +60,16 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
+	router.Use(jwtauth.Verifier(tokenAuth))
+	router.Use(jwtauth.Authenticator(tokenAuth))
+
 	router.Get("/banner", getlist.New(log, storage))
 	router.Get("/user_banner", get.New(log, storage))
 
 	router.Post("/banner", save.New(log, storage))
 	router.Patch("/banner/{id}", update.New(log, storage))
 	router.Delete("/banner/{id}", delete_banner.New(log, storage))
+	// })
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 	server := &http.Server{
