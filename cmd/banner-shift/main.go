@@ -29,7 +29,6 @@ const (
 
 var (
 	tokenAuth *jwtauth.JWTAuth
-	ctx       = context.Background()
 )
 
 func init() {
@@ -38,6 +37,8 @@ func init() {
 
 func main() {
 	cfg, usr := config.MustLoad()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
 	log := setupLogger(cfg.Env)
 	log.Info("starting banner-shift", slog.String("env", cfg.Env))
@@ -47,6 +48,7 @@ func main() {
 	log.Debug("current jwt token", slog.String("jwt", tokenString))
 
 	redis, err := redis.New(
+		ctx,
 		cfg.Redis.Addr,
 		cfg.Redis.User,
 		cfg.Redis.Password,
@@ -59,6 +61,7 @@ func main() {
 	}
 
 	storage, err := postgresql.New(
+		ctx,
 		cfg.PostgreSQL.User,
 		cfg.PostgreSQL.Password,
 		cfg.PostgreSQL.Host,
@@ -86,7 +89,6 @@ func main() {
 	router.Post("/banner", save.New(log, storage, redis))
 	router.Patch("/banner/{id}", update.New(log, storage))
 	router.Delete("/banner/{id}", delete_banner.New(log, storage))
-	// })
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 	server := &http.Server{
