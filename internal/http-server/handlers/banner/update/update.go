@@ -12,6 +12,7 @@ import (
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
 )
 
@@ -43,6 +44,14 @@ func New(log *slog.Logger, bannerUpdater BannerUpdater) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		_, claims, _ := jwtauth.FromContext(r.Context())
+		fmt.Println(claims)
+		if claims["role"] != "admin" {
+			render.Status(r, 403)
+			render.JSON(w, r, resp.Error("Пользователь не имеет доступа"))
+			return
+		}
 
 		var (
 			req Request
