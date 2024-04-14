@@ -18,10 +18,11 @@ RUN CGO_ENABLED=0 go build -o /bin/banner-shift ./cmd/banner-shift
 
 FROM alpine:latest
 
-COPY --from=builder /app/config/docker.yaml /config/docker.yaml
+
+COPY --from=builder /app/config /config
 
 COPY --from=builder /bin/banner-shift /banner-shift
 
 EXPOSE 8080
 
-CMD ["/banner-shift", "--config", "./config/docker.yaml"]
+CMD ["/banner-shift", "--config", "./config/docker.yaml", "--user", "./config/mock/admin.yaml"]
