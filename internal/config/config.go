@@ -13,6 +13,7 @@ type Config struct {
 	Env        string `yaml:"env" env-default:"dev"`
 	HTTPServer `yaml:"http_server"`
 	PostgreSQL `yaml:"postgres"`
+	Redis      `yaml:"redis"`
 }
 
 type HTTPServer struct {
@@ -27,6 +28,14 @@ type PostgreSQL struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 	DB       string `yaml:"db" env-default:"postgres"`
+}
+
+type Redis struct {
+	Addr     string `yaml:"addr"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
+	Protocol int    `yaml:"protocol"`
 }
 
 type User struct {
