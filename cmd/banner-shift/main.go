@@ -84,7 +84,7 @@ func main() {
 	router.Use(jwtauth.Authenticator(tokenAuth))
 
 	router.Get("/banner", getlist.New(log, storage))
-	router.Get("/user_banner", get.New(log, storage))
+	router.Get("/user_banner", get.New(log, storage, redis))
 
 	router.Post("/banner", save.New(log, storage, redis))
 	router.Patch("/banner/{id}", update.New(log, storage))

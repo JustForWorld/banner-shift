@@ -36,8 +36,19 @@ func (s *Storage) SetBanner(ctx context.Context, tagID, featureID int64, content
 	key := fmt.Sprintf("%d:%d", tagID, featureID)
 	err := s.db.Set(ctx, key, content, 0).Err()
 	if err != nil {
-		return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+		return fmt.Errorf("%s: %w: %w", op, storage.ErrBannerInvalidData, err)
 	}
 
 	return nil
+}
+
+func (s *Storage) GetBanner(ctx context.Context, key string) ([]byte, error) {
+	const op = "storage.redis.GetBanner"
+
+	value, err := s.db.Get(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w: %w", op, storage.ErrBannerNotFound, err)
+	}
+
+	return []byte(value), nil
 }
