@@ -29,9 +29,16 @@ type PostgreSQL struct {
 	DB       string `yaml:"db" env-default:"postgres"`
 }
 
-func MustLoad() *Config {
+type User struct {
+	Username string `yaml:"username"`
+	Tag      int64  `yaml:"tag"`
+	Role     string `yaml:"role"`
+}
+
+func MustLoad() (*Config, *User) {
 	// TODO: remove default value
 	configPath := flag.String("config", "./config/local.yaml", "for initiate configuration")
+	userPath := flag.String("user", "./config/mock/user.yaml", "for initiate default user")
 	flag.Parse()
 
 	if *configPath == "" {
@@ -48,5 +55,10 @@ func MustLoad() *Config {
 		log.Fatalf("cannot read config: %s", err)
 	}
 
-	return &cfg
+	var usr User
+	if err := cleanenv.ReadConfig(*userPath, &usr); err != nil {
+		log.Fatalf("cannot read user config: %s", err)
+	}
+
+	return &cfg, &usr
 }
