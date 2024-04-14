@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,7 +25,7 @@ type Response struct {
 }
 
 type BannerRemove interface {
-	DeleteBanner(bannerID int64) error
+	DeleteBanner(ctx context.Context, bannerID int64) error
 }
 
 func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
@@ -59,11 +60,11 @@ func New(log *slog.Logger, bannerRemove BannerRemove) http.HandlerFunc {
 		}
 		log.Info("path parameter is valid", slog.Any("request", req))
 
-		err = bannerRemove.DeleteBanner(req.ID)
+		err = bannerRemove.DeleteBanner(r.Context(), req.ID)
 		if errors.Is(err, storage.ErrBannerNotExists) {
-			log.Info("banner not found", log.With(
+			log.Info("banner not found",
 				slog.Any("banner_id", req.ID),
-			))
+			)
 
 			// TODO: check user tag in banner tags
 			render.Status(r, 404)
