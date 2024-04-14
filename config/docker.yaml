@@ -10,7 +10,7 @@ postgres:
   password: postgres
   db: postgres
 redis:
-  addr: localhost:6379
+  addr: redis:6379
   user: user
   password: ""
   db: 0

@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/redis/go-redis/v9"
@@ -34,7 +35,7 @@ func (s *Storage) SetBanner(ctx context.Context, tagID, featureID int64, content
 	const op = "storage.redis.SetBanner"
 
 	key := fmt.Sprintf("%d:%d", tagID, featureID)
-	err := s.db.Set(ctx, key, content, 0).Err()
+	err := s.db.Set(ctx, key, content, 5*time.Minute).Err()
 	if err != nil {
 		return fmt.Errorf("%s: %w: %w", op, storage.ErrBannerInvalidData, err)
 	}
