@@ -9,6 +9,7 @@ import (
 	response "github.com/JustForWorld/banner-shift/internal/http-server/handlers"
 	"github.com/JustForWorld/banner-shift/internal/storage/postgresql"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
 )
 
@@ -31,6 +32,14 @@ type BannerGetterList interface {
 func New(log *slog.Logger, bannerGetterList BannerGetterList) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.banner.getList.New"
+
+		_, claims, _ := jwtauth.FromContext(r.Context())
+		fmt.Println(claims)
+		if claims["role"] != "admin" {
+			render.Status(r, 403)
+			render.JSON(w, r, response.Error("Пользователь не имеет доступа"))
+			return
+		}
 
 		log := log.With(
 			slog.String("op", op),

@@ -2,6 +2,7 @@ package get
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	resp "github.com/JustForWorld/banner-shift/internal/http-server/handlers"
 	"github.com/JustForWorld/banner-shift/internal/storage"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
 )
 
@@ -34,6 +36,28 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		_, claims, _ := jwtauth.FromContext(r.Context())
+		log.Debug("user auth", claims["username"], claims["tag"])
+		if claims["role"] == "user" {
+			TagID, err := strconv.ParseInt(r.URL.Query().Get("tag_id"), 10, 64)
+			if err != nil {
+				log.Error("request query parameter tag_id is not integer")
+
+				render.Status(r, 400)
+				render.JSON(w, r, resp.Error("Некорректные данные"))
+				return
+			}
+			log.Info("request query parameter is valid")
+
+			userTag, ok := claims["tag"].(int)
+			if ok && userTag != int(TagID) {
+				// fmt.Printf("%T %T %v %v\n", int(TagID), claims["tag"], int(TagID), claims["tag"])
+				render.Status(r, 404)
+				render.JSON(w, r, resp.Error(fmt.Sprintf("Баннер для %v не найден", claims["username"])))
+				return
+			}
+		}
 
 		var (
 			req Request
@@ -77,7 +101,7 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 			))
 
 			render.Status(r, 404)
-			render.JSON(w, r, resp.Error("Баннер для пользователя не найден"))
+			render.JSON(w, r, resp.Error(fmt.Sprintf("Баннер для %v не найден", claims["username"])))
 			return
 		}
 		if err != nil {
