@@ -183,11 +183,11 @@ func (s *Storage) CreateBanner(ctx context.Context, redis *redis.Storage, featur
 	defer stmtNewBanner.Close()
 
 	var bannerID int64
-	contentBytes, err := json.Marshal(content)
-	if err != nil {
-		return 0, fmt.Errorf("%s: %w", op, err)
-	}
-	err = tx.Stmt(stmtNewBanner).QueryRowContext(ctx, contentBytes, isActive, featureID).Scan(&bannerID)
+	// contentBytes, err := json.Marshal(content)
+	// if err != nil {
+	// 	return 0, fmt.Errorf("%s: %w", op, err)
+	// }
+	err = tx.Stmt(stmtNewBanner).QueryRowContext(ctx, content, isActive, featureID).Scan(&bannerID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
 			return 0, fmt.Errorf("%s: %w: %w", op, storage.ErrBannerInvalidData, err)
@@ -385,12 +385,12 @@ func (s *Storage) DeleteBanner(ctx context.Context, bannerID int64) error {
 	return nil
 }
 
-func (s *Storage) GetBanner(ctx context.Context, tagID, featureID int64) (string, error) {
+func (s *Storage) GetBanner(ctx context.Context, tagID, featureID int64) (json.RawMessage, error) {
 	const op = "storage.postgresql.GetBanner"
 
 	// checking required fields
 	if tagID == 0 || featureID == 0 {
-		return "", fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+		return nil, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
 	}
 
 	// get banner
@@ -401,17 +401,17 @@ func (s *Storage) GetBanner(ctx context.Context, tagID, featureID int64) (string
         WHERE b.feature_id = $1 AND bt.tag_id = $2;
 	`)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	var content string
+	var content json.RawMessage
 	err = stmtGetBanner.QueryRowContext(ctx, featureID, tagID).Scan(&content)
 	if err != nil {
 		// if not exist
 		if strings.Contains(err.Error(), "no rows in result set") {
-			return "", fmt.Errorf("%s: %w", op, storage.ErrBannerNotFound)
+			return nil, fmt.Errorf("%s: %w", op, storage.ErrBannerNotFound)
 		}
-		return "", fmt.Errorf("%s: failed get content row: %w", op, err)
+		return nil, fmt.Errorf("%s: failed get content row: %w", op, err)
 	}
 
 	return content, nil
@@ -448,11 +448,15 @@ func (s *Storage) GetBannerList(ctx context.Context, featureID, tagID, limit, of
 		query += fmt.Sprintf("WHERE bt.tag_id = ($%v)", cntArgs)
 		args = append(args, tagID)
 	}
+	query += "ORDER BY id "
 	if limit != 0 {
 		cntArgs++
-		query += fmt.Sprintf("LIMIT ($%v);", cntArgs)
+		query += fmt.Sprintf("LIMIT ($%v)", cntArgs)
 		args = append(args, limit)
 	}
+	cntArgs++
+	query += fmt.Sprintf("OFFSET ($%v);", cntArgs)
+	args = append(args, offset)
 
 	// get banner list
 	stmtGetBannerList, err := s.db.PrepareContext(ctx, query)
