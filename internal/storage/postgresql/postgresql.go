@@ -183,10 +183,6 @@ func (s *Storage) CreateBanner(ctx context.Context, redis *redis.Storage, featur
 	defer stmtNewBanner.Close()
 
 	var bannerID int64
-	// contentBytes, err := json.Marshal(content)
-	// if err != nil {
-	// 	return 0, fmt.Errorf("%s: %w", op, err)
-	// }
 	err = tx.Stmt(stmtNewBanner).QueryRowContext(ctx, content, isActive, featureID).Scan(&bannerID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
