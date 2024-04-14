@@ -1,6 +1,7 @@
 package getlist
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,7 +27,7 @@ type Response struct {
 }
 
 type BannerGetterList interface {
-	GetBannerList(featureID, tagID, limit, offset int64) ([]*postgresql.Banner, error)
+	GetBannerList(ctx context.Context, featureID, tagID, limit, offset int64) ([]*postgresql.Banner, error)
 }
 
 func New(log *slog.Logger, bannerGetterList BannerGetterList) http.HandlerFunc {
@@ -103,7 +104,7 @@ func New(log *slog.Logger, bannerGetterList BannerGetterList) http.HandlerFunc {
 		}
 
 		var resp Response
-		resp.Banners, err = bannerGetterList.GetBannerList(req.FeatureID, req.TagID, req.Limit, req.Offset)
+		resp.Banners, err = bannerGetterList.GetBannerList(r.Context(), req.FeatureID, req.TagID, req.Limit, req.Offset)
 		if err != nil {
 			// TODO!!! server error
 			fmt.Println(err)

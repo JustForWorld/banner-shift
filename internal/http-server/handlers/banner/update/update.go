@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -33,7 +34,7 @@ type Banner struct {
 }
 
 type BannerUpdater interface {
-	UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error
+	UpdateBanner(ctx context.Context, bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error
 }
 
 func New(log *slog.Logger, bannerUpdater BannerUpdater) http.HandlerFunc {
@@ -86,7 +87,7 @@ func New(log *slog.Logger, bannerUpdater BannerUpdater) http.HandlerFunc {
 		}
 		log.Info("request body decoded", slog.Any("request", req))
 
-		err = bannerUpdater.UpdateBanner(req.BannerID, req.Banner.FeatureID, req.Banner.TagIDs, req.Banner.Content, req.Banner.IsActive)
+		err = bannerUpdater.UpdateBanner(r.Context(), req.BannerID, req.Banner.FeatureID, req.Banner.TagIDs, req.Banner.Content, req.Banner.IsActive)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
 			log.Info("banner with invalid data", log.With(
 				slog.Any("feature_id", req.Banner.FeatureID),

@@ -1,6 +1,7 @@
 package postgresql
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -25,7 +26,7 @@ type Banner struct {
 	UpdatedAT string      `json:"updated_at"`
 }
 
-func New(user, password, host, dbname string, port int) (*Storage, error) {
+func New(ctx context.Context, user, password, host, dbname string, port int) (*Storage, error) {
 	const op = "storage.postgresql.New"
 
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
@@ -36,7 +37,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	}
 
 	// create banner table
-	stmtBanner, err := db.Prepare(`
+	stmtBanner, err := db.PrepareContext(ctx, `
 		CREATE TABLE IF NOT EXISTS banner (
 			id SERIAL PRIMARY KEY,
 			content JSONB,
@@ -50,13 +51,13 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 		return nil, fmt.Errorf("create banner: %s: %w", op, err)
 	}
 
-	_, err = stmtBanner.Exec()
+	_, err = stmtBanner.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec banner: %s: %w", op, err)
 	}
 
 	// create banner_tag table
-	stmtBannerTag, err := db.Prepare(`
+	stmtBannerTag, err := db.PrepareContext(ctx, `
 		CREATE TABLE IF NOT EXISTS banner_tag (
 			id SERIAL PRIMARY KEY,
 			banner_id INTEGER,
@@ -68,13 +69,13 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 		return nil, fmt.Errorf("create banner_tag: %s: %w", op, err)
 	}
 
-	_, err = stmtBannerTag.Exec()
+	_, err = stmtBannerTag.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec banner_tag: %s: %w", op, err)
 	}
 
 	// create tag table
-	stmtTag, err := db.Prepare(`
+	stmtTag, err := db.PrepareContext(ctx, `
 		CREATE TABLE IF NOT EXISTS tag (
 			id SERIAL PRIMARY KEY
 		);
@@ -83,13 +84,13 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 		return nil, fmt.Errorf("create tag: %s: %w", op, err)
 	}
 
-	_, err = stmtTag.Exec()
+	_, err = stmtTag.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec tag: %s: %w", op, err)
 	}
 
 	// create feature table
-	stmtFeature, err := db.Prepare(`
+	stmtFeature, err := db.PrepareContext(ctx, `
 		CREATE TABLE IF NOT EXISTS feature (
 			id SERIAL PRIMARY KEY
 		);
@@ -98,59 +99,59 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 		return nil, fmt.Errorf("create feature: %s: %w", op, err)
 	}
 
-	_, err = stmtFeature.Exec()
+	_, err = stmtFeature.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec feature: %s: %w", op, err)
 	}
 
 	// create relations between banner < banner_tag tables
-	stmtRelBanner, err := db.Prepare(`
+	stmtRelBanner, err := db.PrepareContext(ctx, `
 		ALTER TABLE banner_tag ADD FOREIGN KEY (banner_id) REFERENCES banner (id) ON DELETE CASCADE;
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create relation between banner < banner_tag: %s: %w", op, err)
 	}
 
-	_, err = stmtRelBanner.Exec()
+	_, err = stmtRelBanner.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec relation between banner < banner_tag: %s: %w", op, err)
 	}
 
 	// create relations between banner > feature tables
-	stmtRelFeature, err := db.Prepare(`
+	stmtRelFeature, err := db.PrepareContext(ctx, `
 		ALTER TABLE banner ADD FOREIGN KEY (feature_id) REFERENCES feature (id);
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create relation between banner > feature: %s: %w", op, err)
 	}
 
-	_, err = stmtRelFeature.Exec()
+	_, err = stmtRelFeature.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec relation between banner > feature: %s: %w", op, err)
 	}
 
 	// create relations between tag < banner_tag tables
-	stmtRelTag, err := db.Prepare(`
+	stmtRelTag, err := db.PrepareContext(ctx, `
 		ALTER TABLE banner_tag ADD FOREIGN KEY (tag_id) REFERENCES tag (id);
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create relation between tag < banner_tag: %s: %w", op, err)
 	}
 
-	_, err = stmtRelTag.Exec()
+	_, err = stmtRelTag.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec relation between tag < banner_tag: %s: %w", op, err)
 	}
 
 	// create UNIQUE CONSTAINT with tag_id and feature_id
-	stmtUniqueTagFeature, err := db.Prepare(`
+	stmtUniqueTagFeature, err := db.PrepareContext(ctx, `
 		ALTER TABLE banner_tag ADD CONSTRAINT unique_tag_feature UNIQUE (tag_id, feature_id);
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("create UNIQUE CONSTAINT with tag_id and feature_id: %s: %w", op, err)
 	}
 
-	_, err = stmtUniqueTagFeature.Exec()
+	_, err = stmtUniqueTagFeature.ExecContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("exec UNIQUE CONSTAINT with tag_id and feature_id: %s: %w", op, err)
 	}
@@ -158,7 +159,7 @@ func New(user, password, host, dbname string, port int) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []int, content interface{}, isActive bool) (int64, error) {
+func (s *Storage) CreateBanner(ctx context.Context, redis *redis.Storage, featureID int64, tagIDs []int, content []byte, isActive bool) (int64, error) {
 	const op = "storage.postgresql.CreateBanner"
 
 	// checking required fields
@@ -173,7 +174,7 @@ func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []i
 	defer tx.Rollback()
 
 	// insert new banner
-	stmtNewBanner, err := s.db.Prepare(`
+	stmtNewBanner, err := s.db.PrepareContext(ctx, `
 		INSERT INTO banner(content, is_active, feature_id) VALUES($1, $2, $3) RETURNING id
 	`)
 	if err != nil {
@@ -186,17 +187,17 @@ func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []i
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
-	err = tx.Stmt(stmtNewBanner).QueryRow(contentBytes, isActive, featureID).Scan(&bannerID)
+	err = tx.Stmt(stmtNewBanner).QueryRowContext(ctx, contentBytes, isActive, featureID).Scan(&bannerID)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && (pqErr.Code.Name() == "invalid_text_representation" || pqErr.Code.Name() == "foreign_key_violation") {
-			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
+			return 0, fmt.Errorf("%s: %w: %w", op, storage.ErrBannerInvalidData, err)
 		}
 		return 0, fmt.Errorf("%s: failed to get last insert banner id: %w", op, err)
 	}
 
 	// insert banner with tagIDs
 	for _, tagID := range tagIDs {
-		stmtNewBannerTag, err := s.db.Prepare(`
+		stmtNewBannerTag, err := s.db.PrepareContext(ctx, `
 			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3)
 		`)
 		if err != nil {
@@ -204,7 +205,7 @@ func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []i
 		}
 		defer stmtNewBannerTag.Close()
 
-		_, err = tx.Stmt(stmtNewBannerTag).Exec(bannerID, tagID, featureID)
+		_, err = tx.Stmt(stmtNewBannerTag).ExecContext(ctx, bannerID, tagID, featureID)
 		if err != nil {
 			tx.Rollback()
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "unique_violation" {
@@ -214,10 +215,10 @@ func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []i
 		}
 
 		// insert data to redis
-		err = redis.SetBanner(int64(tagID), featureID, content)
+		err = redis.SetBanner(ctx, int64(tagID), featureID, content)
 		if err != nil {
-			tx.Rollback()
-			return 0, fmt.Errorf("%s: %w", op, storage.ErrBannerNotAdd)
+			// tx.Rollback()
+			return 0, fmt.Errorf("%s: %w: %w", op, storage.ErrBannerNotAdd, err)
 		}
 	}
 
@@ -229,24 +230,24 @@ func (s *Storage) CreateBanner(redis *redis.Storage, featureID int64, tagIDs []i
 	return bannerID, nil
 }
 
-func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error {
+func (s *Storage) UpdateBanner(ctx context.Context, bannerID int64, featureID int64, tagIDs []int, content interface{}, isActive interface{}) error {
 	const op = "storage.postgresql.UpdateBanner"
 
 	// Check if feature_id has changed
 	var existingFeatureID int64
-	err := s.db.QueryRow(`SELECT feature_id FROM banner WHERE id = $1`, bannerID).Scan(&existingFeatureID)
+	err := s.db.QueryRowContext(ctx, `SELECT feature_id FROM banner WHERE id = $1`, bannerID).Scan(&existingFeatureID)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get existing feature_id: %w", op, err)
 	}
 
 	if existingFeatureID != featureID {
 		// Delete existing banner_tag entries for the given banner_id and existingFeatureID
-		stmtDeleteBannerTags, err := s.db.Prepare(`DELETE FROM banner_tag WHERE banner_id = $1 AND feature_id = $2`)
+		stmtDeleteBannerTags, err := s.db.PrepareContext(ctx, `DELETE FROM banner_tag WHERE banner_id = $1 AND feature_id = $2`)
 		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
 
-		_, err = stmtDeleteBannerTags.Exec(bannerID, existingFeatureID)
+		_, err = stmtDeleteBannerTags.ExecContext(ctx, bannerID, existingFeatureID)
 		if err != nil {
 			return fmt.Errorf("%s: failed to delete existing banner_tag entries: %w", op, err)
 		}
@@ -298,13 +299,13 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 	query += fmt.Sprintf(` WHERE id = ($%v);`, cntArgs)
 
 	// update banner
-	stmtUpdateBanner, err := s.db.Prepare(query)
+	stmtUpdateBanner, err := s.db.PrepareContext(ctx, query)
 	if err != nil {
 		fmt.Println(query)
 		return fmt.Errorf(" %s: %w", op, err)
 	}
 
-	_, err = stmtUpdateBanner.Exec(args...)
+	_, err = stmtUpdateBanner.ExecContext(ctx, args...)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "invalid_text_representation" {
 			return fmt.Errorf("%s: %w", op, storage.ErrBannerInvalidData)
@@ -316,7 +317,7 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 	// insert banner with tagIDs
 	for _, tagID := range tagIDs {
 		// TODO: change to UPDATE (there's no point now?)
-		stmtNewBannerTag, err := s.db.Prepare(`
+		stmtNewBannerTag, err := s.db.PrepareContext(ctx, `
 			INSERT INTO banner_tag(banner_id, tag_id, feature_id)  VALUES($1, $2, $3)
 			ON CONFLICT (tag_id, feature_id) DO UPDATE SET banner_id = ($1), tag_id = ($2), feature_id = ($3);
 		`)
@@ -324,7 +325,7 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 			return fmt.Errorf("%s: %w", op, err)
 		}
 
-		err = stmtNewBannerTag.QueryRow(bannerID, tagID, featureID).Err()
+		err = stmtNewBannerTag.QueryRowContext(ctx, bannerID, tagID, featureID).Err()
 		if err != nil {
 			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "foreign_key_violation" {
 				return fmt.Errorf("%s: %w", op, storage.ErrBannerNotExists)
@@ -336,7 +337,7 @@ func (s *Storage) UpdateBanner(bannerID int64, featureID int64, tagIDs []int, co
 	return nil
 }
 
-func (s *Storage) DeleteBanner(bannerID int64) error {
+func (s *Storage) DeleteBanner(ctx context.Context, bannerID int64) error {
 	const op = "storage.postgresql.DeleteBanner"
 
 	// checking required field
@@ -351,7 +352,7 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	defer tx.Rollback()
 
 	// delete banner
-	stmtDeleteBanner, err := s.db.Prepare(`
+	stmtDeleteBanner, err := s.db.PrepareContext(ctx, `
 		DELETE FROM banner
 		WHERE id = ($1);
 	`)
@@ -360,7 +361,7 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	}
 	defer stmtDeleteBanner.Close()
 
-	result, err := tx.Stmt(stmtDeleteBanner).Exec(bannerID)
+	result, err := tx.Stmt(stmtDeleteBanner).ExecContext(ctx, bannerID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("%s: failed delete row: %w", op, err)
@@ -384,7 +385,7 @@ func (s *Storage) DeleteBanner(bannerID int64) error {
 	return nil
 }
 
-func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
+func (s *Storage) GetBanner(ctx context.Context, tagID, featureID int64) (string, error) {
 	const op = "storage.postgresql.GetBanner"
 
 	// checking required fields
@@ -393,7 +394,7 @@ func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
 	}
 
 	// get banner
-	stmtGetBanner, err := s.db.Prepare(`
+	stmtGetBanner, err := s.db.PrepareContext(ctx, `
         SELECT b.content
         FROM banner b
         JOIN banner_tag bt ON b.id = bt.banner_id
@@ -404,7 +405,7 @@ func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
 	}
 
 	var content string
-	err = stmtGetBanner.QueryRow(featureID, tagID).Scan(&content)
+	err = stmtGetBanner.QueryRowContext(ctx, featureID, tagID).Scan(&content)
 	if err != nil {
 		// if not exist
 		if strings.Contains(err.Error(), "no rows in result set") {
@@ -416,7 +417,7 @@ func (s *Storage) GetBanner(tagID, featureID int64) (string, error) {
 	return content, nil
 }
 
-func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banner, error) {
+func (s *Storage) GetBannerList(ctx context.Context, featureID, tagID, limit, offset int64) ([]*Banner, error) {
 	const op = "storage.postgresql.GetBannerList"
 
 	// optional params in query
@@ -454,12 +455,12 @@ func (s *Storage) GetBannerList(featureID, tagID, limit, offset int64) ([]*Banne
 	}
 
 	// get banner list
-	stmtGetBannerList, err := s.db.Prepare(query)
+	stmtGetBannerList, err := s.db.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	rows, err := stmtGetBannerList.Query(args...)
+	rows, err := stmtGetBannerList.QueryContext(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
 	}

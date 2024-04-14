@@ -1,6 +1,7 @@
 package get
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,7 +26,7 @@ type Response struct {
 }
 
 type BannerGetter interface {
-	GetBanner(tagID, featureID int64) (string, error)
+	GetBanner(ctx context.Context, tagID, featureID int64) (string, error)
 }
 
 func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
@@ -83,7 +84,7 @@ func New(log *slog.Logger, bannerGetter BannerGetter) http.HandlerFunc {
 		log.Info("request query parameter is valid", slog.Any("request", req))
 
 		var res Response
-		res.Content, err = bannerGetter.GetBanner(req.TagID, req.FeatureID)
+		res.Content, err = bannerGetter.GetBanner(r.Context(), req.TagID, req.FeatureID)
 		if errors.Is(err, storage.ErrBannerInvalidData) {
 			log.Info("banner with invalid fata", log.With(
 				slog.Any("feature_id", req.FeatureID),
