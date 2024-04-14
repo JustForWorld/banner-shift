@@ -93,7 +93,7 @@ sudo docker compose down
 ## Работа с сервисом
 ### 1. Curl
 **1.1** **GET** _/user_banner_ — получение баннера для пользователя:
-```curl
+```bash
 curl -X GET "http://localhost:8080/user_banner?tag_id=7&feature_id=1&use_last_revision=true" \
 -H "Authorization: Bearer {ВАШ_ТОКЕН_УБРАТЬ_CURLE_СКОБКИ}" 
 ```
@@ -139,7 +139,7 @@ curl -X PATCH 'http://localhost:8080/banner/1' \
 
 ```
 
-**1.5** **PATCH** _/banner/{id}_ — обновление содержимого баннера:
+**1.5** **DELETE** _/banner/{id}_ — удаление баннера по идентификатору::
 ```bash
 curl -X DELETE "http://localhost:8080/banner/1" \
 -H "Authorization: Bearer {ВАШ_ТОКЕН_УБРАТЬ_CURLE_СКОБКИ}"
